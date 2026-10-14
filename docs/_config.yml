@@ -1,0 +1,11 @@
+title: FACTS
+description: Femur Archaeological CT Superresolution - a real-world multiscale bone CT dataset for 3D super-resolution
+baseurl: "/FACTS"
+url: "https://phialosophy10.github.io"
+repository: phialosophy10/FACTS
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+exclude:
+  - README.md

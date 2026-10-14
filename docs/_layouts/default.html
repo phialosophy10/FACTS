@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title | default: site.title }}</title>
+  <meta name="description" content="{{ site.description }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Dataset &amp; benchmark</p>
+      <h1>FACTS</h1>
+      <p class="lede">Femur Archaeological CT Superresolution: 13 human proximal femurs scanned with both clinical CT and micro-CT, registered voxel to voxel. A benchmark for real-world 3D bone super-resolution.</p>
+      <nav class="buttons">
+        <a class="btn primary" href="https://archive.compute.dtu.dk/files/public/projects/FACTS">Download data</a>
+        <a class="btn" href="https://doi.org/10.1007/978-3-031-66958-3_12">Paper (MIUA 2024)</a>
+        <a class="btn" href="https://github.com/{{ site.repository }}">Code</a>
+        <a class="btn" href="#citing">Cite</a>
+      </nav>
+    </div>
+  </header>
+  <nav class="toc"><div class="wrap">
+    <a href="#dataset">Dataset</a><a href="#preprocessing">Preprocessing</a><a href="#benchmark">Benchmark</a><a href="#results">Results</a><a href="#citing">Citing</a>
+  </div></nav>
+  <main class="wrap content">
+    {{ content }}
+  </main>
+  <footer><div class="wrap">
+    Technical University of Denmark (DTU Compute) &middot; University of Copenhagen &middot; University of California, San Francisco
+  </div></footer>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{%- comment -%} Summary table for one test input. Parameter: test_key ('real' or 'synth') {%- endcomment -%}
+{%- assign rows = site.data.results.summary | where: "test_key", include.test_key -%}
+{%- if rows.size > 0 -%}
+<div class="table-scroll"><table>
+<thead><tr>
+  <th>Model</th><th>Trained on</th>
+  <th class="num">PSNR (dB) &uarr;</th><th class="num">SSIM &uarr;</th><th class="num">LPIPS &darr;</th>
+  <th class="num">BV/TV</th><th class="num">&Delta; BV/TV</th>
+  <th class="num">Tb.Th (&micro;m)</th><th class="num">&Delta; Tb.Th (&micro;m)</th>
+</tr></thead>
+<tbody>
+{%- for r in rows %}
+<tr{% if r.model == "Input" %} class="baseline"{% endif %}>
+  <td>{% if r.model == "Input" %}Input (no SR){% else %}{{ r.model }}{% endif %}</td>
+  <td>{{ r.train_data }}</td>
+  <td class="num">{{ r.psnr | round: 2 }} &plusmn; {{ r.psnr_std | round: 2 }}</td>
+  <td class="num">{{ r.ssim | round: 3 }} &plusmn; {{ r.ssim_std | round: 3 }}</td>
+  <td class="num">{% if r.lpips %}{{ r.lpips | round: 3 }} &plusmn; {{ r.lpips_std | round: 3 }}{% else %}-{% endif %}</td>
+  <td class="num">{{ r.bvtv | round: 3 }}</td>
+  <td class="num">{{ r.bvtv_err | round: 3 }} &plusmn; {{ r.bvtv_err_std | round: 3 }}</td>
+  <td class="num">{{ r.tbth_um | round: 0 }}</td>
+  <td class="num">{{ r.tbth_err_um | round: 0 }} &plusmn; {{ r.tbth_err_um_std | round: 0 }}</td>
+</tr>
+{%- endfor %}
+<tr><td>Micro-CT (reference)</td><td>-</td><td class="num">-</td><td class="num">-</td><td class="num">-</td>
+  <td class="num">{{ rows[0].bvtv_hr | round: 3 }}</td><td class="num">-</td>
+  <td class="num">{{ rows[0].tbth_hr_um | round: 0 }}</td><td class="num">-</td></tr>
+</tbody></table></div>
+{%- else -%}
+<p class="callout">Results pending: run the test jobs and <code>scripts/make_results.py</code> to fill in this table.</p>
+{%- endif -%}

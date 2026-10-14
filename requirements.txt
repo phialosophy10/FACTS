@@ -1,0 +1,10 @@
+# PyTorch is installed separately by init.sh (CUDA-specific wheel), see README
+numpy
+scipy
+scikit-image
+tifffile
+matplotlib
+lpips
+localthickness
+# optional: experiment tracking with --wandb
+# wandb
