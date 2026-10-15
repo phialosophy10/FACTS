@@ -9,9 +9,14 @@
 # Check which Python modules exist with:  module avail python3
 # Check the GPU driver / max. CUDA version on a GPU node (e.g. after `a100sh`) with:  nvidia-smi
 
-PY_MODULE=${PY_MODULE:-python3/3.11.9}
 TORCH_CUDA=${TORCH_CUDA:-cu126}
 VENV_DIR=${VENV_DIR:-$HOME/venvs/facts}
+# Use the Python version the venv was created with (read from pyvenv.cfg), else the default
+if [ -z "$PY_MODULE" ] && [ -f "$VENV_DIR/pyvenv.cfg" ]; then
+    PY_VERSION=$(grep -E '^version' "$VENV_DIR/pyvenv.cfg" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    [ -n "$PY_VERSION" ] && PY_MODULE="python3/$PY_VERSION"
+fi
+PY_MODULE=${PY_MODULE:-python3/3.12.11}
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if ! module load "$PY_MODULE" 2>/dev/null; then
