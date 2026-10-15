@@ -27,6 +27,7 @@ from facts import config, io
 from facts.data import FemurVolume, Normalizer
 from facts.metrics import LPIPSMetric, bone_metrics, psnr_masked, ssim_masked
 from facts.models import build_generator
+from facts.tracking import add_wandb_args, init_wandb
 
 
 def parse_args():
@@ -44,6 +45,7 @@ def parse_args():
     p.add_argument("--overlap", type=int, default=64, help="Tile overlap for inference")
     p.add_argument("--no_save", action="store_true", help="Do not save the SR volumes")
     p.add_argument("--no_lpips", action="store_true")
+    add_wandb_args(p)
     return p.parse_args()
 
 
@@ -82,6 +84,15 @@ def main():
         out_dir = args.out or os.path.join(args.run, f"test_{args.input}")
     os.makedirs(out_dir, exist_ok=True)
     lpips_fn = None if args.no_lpips else LPIPSMetric(device)
+
+    wandb_run = None
+    if args.wandb:
+        import wandb
+        # Grouped with the training run of the same model, so train and test show up together
+        group = "baseline" if args.baseline else os.path.basename(os.path.normpath(args.run))
+        wandb_run = init_wandb(args, out_dir, f"{group}_test_{args.input}", job_type="test", group=group,
+                               config={**vars(args), "model": meta["model"], "train_data": meta["train_data"],
+                                       "test_data": args.input})
 
     results = []
     for femur in args.femurs:
@@ -137,8 +148,15 @@ def main():
         # Example slice (middle of the evaluated slices) for figures
         k = len(ev["hr"]) // 2
         z = ev["z"][k]
+        lr_ex = np.clip(mnorm(f.lr[z].astype(np.float32) + f.lr_offset), 0, 1)
         np.savez_compressed(os.path.join(out_dir, f"{f.name}_example.npz"), hr=ev["hr"][k], sr=ev["sr"][k],
-                            lr=np.clip(mnorm(f.lr[z].astype(np.float32) + f.lr_offset), 0, 1), mask=ev["mask"][k], slice=z)
+                            lr=lr_ex, mask=ev["mask"][k], slice=z)
+        if wandb_run:
+            ys, xs = np.nonzero(ev["mask"][k])
+            crop = (slice(ys.min(), ys.max() + 1), slice(xs.min(), xs.max() + 1))
+            strip = np.concatenate([lr_ex[crop], ev["sr"][k][crop], ev["hr"][k][crop]], axis=1)
+            wandb.log({f"examples/{f.name}": wandb.Image(strip, caption=f"{f.name}, slice {z}: input | SR | micro-CT"),
+                       **{f"{f.name}/{m}": v for m, v in res.items() if isinstance(v, float)}})
 
         if sr is not None:
             # SR volume on the micro-CT grid and scale; zero outside the bone bounding box
@@ -152,6 +170,15 @@ def main():
     with open(os.path.join(out_dir, "metrics.json"), "w") as fh:
         json.dump(results, fh, indent=2)
     print(f"Saved metrics to {os.path.join(out_dir, 'metrics.json')}")
+
+    if wandb_run:
+        cols = list(results[0].keys())
+        wandb.log({"results": wandb.Table(columns=cols, data=[[r.get(c) for c in cols] for r in results])})
+        for m in ("psnr", "ssim", "lpips", "bvtv_err", "tbth_err_um"):
+            vals = [r[m] for r in results if m in r]
+            if vals:
+                wandb_run.summary[f"mean/{m}"] = float(np.mean(vals))
+        wandb_run.finish()
 
 
 if __name__ == "__main__":

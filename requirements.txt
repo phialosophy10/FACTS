@@ -6,5 +6,4 @@ tifffile
 matplotlib
 lpips
 localthickness
-# optional: experiment tracking with --wandb
-# wandb
+wandb            # experiment tracking (--wandb)

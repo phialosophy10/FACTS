@@ -16,10 +16,14 @@ set -e
 : "${DATA_ROOT:?Set DATA_ROOT}" "${RUN:?Set RUN (run directory or 'baseline')}"
 source init.sh
 
+# Weights & Biases logging is on by default (WANDB=0 to disable)
+WANDB_FLAG=""
+if [ "${WANDB:-1}" = "1" ]; then WANDB_FLAG="--wandb"; fi
+
 for INPUT in real synth; do
     if [ "$RUN" = "baseline" ]; then
-        python test.py --root "$DATA_ROOT" --baseline --input "$INPUT" $TEST_ARGS
+        python test.py --root "$DATA_ROOT" --baseline --input "$INPUT" $WANDB_FLAG $TEST_ARGS
     else
-        python test.py --root "$DATA_ROOT" --run "$RUN" --input "$INPUT" $TEST_ARGS
+        python test.py --root "$DATA_ROOT" --run "$RUN" --input "$INPUT" $WANDB_FLAG $TEST_ARGS
     fi
 done

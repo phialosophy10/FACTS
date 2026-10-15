@@ -76,7 +76,7 @@ The histogram of the micro-CT inside the mask is matched to that of the clinical
 python train.py --root $DATA_ROOT --model ESRGAN --data real     # -> runs/esrgan_real/
 ```
 
-The defaults are 10k L1-only warm-up iterations, then 100k total iterations with L1 + 1e-3 · adversarial loss (no perceptual loss), batch 16, 128×128 patches, Adam lr 1e-4. Slices are taken along axis 2 (`--axis`). Training resumes automatically from `runs/<name>/checkpoint.pt`. The run directory also holds `log.csv` and sample images; `--wandb` logs to Weights & Biases.
+The defaults are 10k L1-only warm-up iterations, then 100k total iterations with L1 + 1e-3 · adversarial loss (no perceptual loss), batch 16, 128×128 patches, Adam lr 1e-4. Slices are taken along axis 2 (`--axis`). Training resumes automatically from `runs/<name>/checkpoint.pt`. The run directory also holds `log.csv` and sample images; `--wandb` also logs to Weights & Biases (see below).
 
 By default the training volumes are loaded into RAM, cropped to the bone bounding box. This needs roughly 100–150 GB for the 10 training femurs. `--mmap` memory-maps the volumes instead, which is only fast with `--axis 0`.
 
@@ -101,6 +101,30 @@ Metrics are computed inside the mask on every 10th slice (`--eval_stride`): PSNR
 python scripts/make_results.py     # -> docs/_data/results.json, docs/assets/img/...
 git add docs && git commit -m "Update results" && git push
 ```
+
+### Logging with Weights & Biases
+
+`train.py` and `test.py` log to [Weights & Biases](https://wandb.ai) with `--wandb`. The LSF jobs pass it by default; set `WANDB=0` to switch it off.
+
+**One-time setup** (on a login node, with the venv active):
+
+```bash
+pip install wandb      # only needed if the venv was created before wandb was added to requirements.txt
+wandb login            # paste the API key from https://wandb.ai/authorize
+```
+
+The key is saved in `~/.netrc`, which the compute nodes can read too.
+
+**What is logged:**
+* **Training** (one W&B run per model): every 100 iterations (`--log_every`), the L1, adversarial and discriminator losses, the mean discriminator outputs for real and fake patches, and the learning rate. Every 2000 iterations (`--val_every`), the validation L1/PSNR, a sample image grid, the seconds per iteration and the GPU memory use.
+  * The W&B run id is stored in `runs/<name>/wandb_id.txt`. A resubmitted job therefore continues the same W&B run, and its curves are plotted against `iter`.
+* **Testing** (one W&B run per model and test input): metrics per femur, a results table, the mean metrics, and example slices (input | SR | micro-CT).
+  * Test runs share the training run's *group*, so W&B shows them together.
+
+**Options:**
+* `--wandb_project` (default `FACTS`), `--wandb_entity` (your user or team) and `--wandb_tags`.
+* The standard environment variables also work, e.g. `WANDB_ENTITY`.
+* If the compute nodes cannot reach wandb.ai, submit with `WANDB_MODE=offline`. Afterwards, upload the logs from a login node with `wandb sync runs/<name>/wandb/offline-run-*`.
 
 ### LSF jobs (DTU HPC)
 

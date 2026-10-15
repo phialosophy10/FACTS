@@ -27,6 +27,7 @@ from torch.utils.data import DataLoader
 from facts import config
 from facts.data import FemurVolume, Normalizer, PatchDataset, fixed_patches
 from facts.models import Discriminator, build_generator
+from facts.tracking import add_wandb_args, init_wandb
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -58,10 +59,11 @@ def parse_args():
     p.add_argument("--no_amp", action="store_true", help="Disable mixed precision")
     p.add_argument("--mmap", action="store_true",
                    help="Memory-map volumes instead of loading them into RAM (slow unless --axis 0)")
+    p.add_argument("--log_every", type=int, default=100, help="Log training losses to wandb every n iterations")
     p.add_argument("--val_every", type=int, default=2_000)
     p.add_argument("--save_every", type=int, default=5_000)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--wandb", action="store_true", help="Log to Weights & Biases")
+    add_wandb_args(p)
     return p.parse_args()
 
 
@@ -170,9 +172,16 @@ def main():
     def save_generator(fname):
         torch.save({"G": G.state_dict(), **meta}, os.path.join(run_dir, fname))
 
+    wandb_run = None
     if args.wandb:
         import wandb
-        wandb.init(project="FACTS", name=name, config=meta, resume="allow", id=name)
+        wandb_run = init_wandb(args, run_dir, name, job_type="train", group=name,
+                               config={**vars(args), "normalizer": norm.state_dict(),
+                                       "n_params_G": sum(p.numel() for p in G.parameters()),
+                                       "n_params_D": sum(p.numel() for p in D.parameters())})
+        # Log against the training iteration, so a resumed run continues the same curves
+        wandb_run.define_metric("iter")
+        wandb_run.define_metric("*", step_metric="iter")
 
     log_path = os.path.join(run_dir, "log.csv")
     new_log = not os.path.exists(log_path)
@@ -186,6 +195,7 @@ def main():
     D.train()
     data_iter = infinite(loader)
     running = {"pix": 0.0, "adv": 0.0, "D": 0.0, "n": 0}
+    wb = {"loss_pix": 0.0, "loss_adv": 0.0, "loss_D": 0.0, "D_real": 0.0, "D_fake": 0.0, "n": 0, "n_gan": 0}
     t_last = time.time()
     for it in range(start + 1, args.iters + 1):
         batch = next(data_iter)
@@ -225,9 +235,28 @@ def main():
             scaler_D.update()
             running["adv"] += loss_adv.item()
             running["D"] += loss_D.item()
+            if wandb_run:
+                wb["loss_adv"] += loss_adv.item()
+                wb["loss_D"] += loss_D.item()
+                wb["D_real"] += pred_real.mean().item()
+                wb["D_fake"] += pred_fake.mean().item()
+                wb["n_gan"] += 1
         sched_D.step()
         running["pix"] += loss_pix.item()
         running["n"] += 1
+
+        if wandb_run:
+            wb["loss_pix"] += loss_pix.item()
+            wb["n"] += 1
+            if it % args.log_every == 0:
+                log_dict = {"iter": it, "train/lr": sched_G.get_last_lr()[0],
+                            "train/loss_pix": wb["loss_pix"] / wb["n"], "train/gan_phase": int(gan_phase)}
+                if wb["n_gan"]:
+                    log_dict.update({f"train/{k}": wb[k] / wb["n_gan"]
+                                     for k in ("loss_adv", "loss_D", "D_real", "D_fake")})
+                wandb.log(log_dict)
+                wb = dict.fromkeys(wb, 0.0)
+                wb["n"] = wb["n_gan"] = 0
 
         if it == args.warmup_iters:
             save_generator("generator_warmup.pt")
@@ -246,10 +275,14 @@ def main():
             log_file.flush()
             print(f"[{it}/{args.iters}] pix {row[2]:.4f} adv {row[3]:.4f} D {row[4]:.4f} | "
                   f"val L1 {row[5]:.4f} PSNR {row[6]:.2f} dB (input {row[7]:.2f} dB) | {row[8]:.3f} s/it")
-            if args.wandb:
-                wandb.log(dict(zip(["iter", "lr", "loss_pix", "loss_adv", "loss_D", "val_l1", "val_psnr",
-                                    "input_psnr", "sec_per_iter"], row)), step=it)
-            save_samples(os.path.join(run_dir, "samples", f"iter_{it:07d}.png"), val_batch, sr_val)
+            sample_path = os.path.join(run_dir, "samples", f"iter_{it:07d}.png")
+            save_samples(sample_path, val_batch, sr_val)
+            if wandb_run:
+                log_dict = {"iter": it, "val/l1": row[5], "val/psnr": row[6], "val/input_psnr": row[7],
+                            "perf/sec_per_iter": row[8], "samples": wandb.Image(sample_path)}
+                if device.type == "cuda":
+                    log_dict["perf/max_gpu_mem_gb"] = torch.cuda.max_memory_allocated() / 1e9
+                wandb.log(log_dict)
             running = {"pix": 0.0, "adv": 0.0, "D": 0.0, "n": 0}
             t_last = time.time()
 
@@ -258,6 +291,9 @@ def main():
 
     save_generator("generator.pt")
     log_file.close()
+    if wandb_run:
+        wandb_run.summary["final_iter"] = args.iters
+        wandb_run.finish()
     print(f"Finished. Generator saved to {os.path.join(run_dir, 'generator.pt')}")
 
 

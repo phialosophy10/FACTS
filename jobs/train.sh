@@ -18,4 +18,8 @@ set -e
 source init.sh
 nvidia-smi
 
-python train.py --root "$DATA_ROOT" --model "$MODEL" --data "$DATA" --workers 7 $TRAIN_ARGS
+# Weights & Biases logging is on by default (WANDB=0 to disable); run `wandb login` once first
+WANDB_FLAG=""
+if [ "${WANDB:-1}" = "1" ]; then WANDB_FLAG="--wandb"; fi
+
+python train.py --root "$DATA_ROOT" --model "$MODEL" --data "$DATA" --workers 7 $WANDB_FLAG $TRAIN_ARGS
