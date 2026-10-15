@@ -4,7 +4,8 @@ __pycache__/
 venv/
 runs/
 results/
-logs/
+logs/*
+!logs/.gitkeep
 *.tif
 *.npy
 *.pt
