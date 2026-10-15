@@ -1,7 +1,7 @@
 #!/bin/bash
 # Train one model. Submit from the repository root, e.g.
-#   MODEL=ESRGAN DATA=real bsub -J esrgan_real < jobs/train.sh
-# DATA_ROOT is read from local.sh (or give it on the command line: DATA_ROOT=... bsub < ...)
+#   bash jobs/submit.sh jobs/train.sh MODEL=ESRGAN DATA=real -- -J esrgan_real
+# DATA_ROOT is read from local.sh.
 # Training resumes from the last checkpoint, so the job can simply be resubmitted
 # if it hits the wall-time limit. Extra train.py arguments can be passed in TRAIN_ARGS.
 #BSUB -J facts_train

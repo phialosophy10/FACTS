@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test a trained model on real and synthetic input (cross-testing). Submit e.g.
-#   RUN=runs/esrgan_real bsub -J test_esrgan_real < jobs/test.sh
-# DATA_ROOT is read from local.sh (or give it on the command line: DATA_ROOT=... bsub < ...)
+#   bash jobs/submit.sh jobs/test.sh RUN=runs/esrgan_real -- -J test_esrgan_real
+# DATA_ROOT is read from local.sh.
 # With RUN=baseline the inputs themselves are evaluated (LR reference).
 #BSUB -J facts_test
 #BSUB -q gpua100

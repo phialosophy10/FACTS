@@ -107,7 +107,7 @@ git add docs && git commit -m "Update results" && git push
 
 ### Logging with Weights & Biases
 
-`train.py` and `test.py` log to [Weights & Biases](https://wandb.ai) with `--wandb`. The LSF jobs pass it by default; set `WANDB=0` to switch it off.
+`train.py` and `test.py` log to [Weights & Biases](https://wandb.ai) with `--wandb`. The LSF jobs pass it by default; pass `WANDB=0` to `jobs/submit.sh` to switch it off.
 
 **One-time setup** (on a login node, with the venv active):
 
@@ -127,23 +127,28 @@ The key is saved in `~/.netrc`, which the compute nodes can read too.
 **Options:**
 * `--wandb_project` (default `FACTS`), `--wandb_entity` (your user or team) and `--wandb_tags`.
 * The standard environment variables also work, e.g. `WANDB_ENTITY`.
-* If the compute nodes cannot reach wandb.ai, submit with `WANDB_MODE=offline`. Afterwards, upload the logs from a login node with `wandb sync runs/<name>/wandb/offline-run-*`.
+* If the compute nodes cannot reach wandb.ai, pass `WANDB_MODE=offline` to `jobs/submit.sh`. Afterwards, upload the logs from a login node with `wandb sync runs/<name>/wandb/offline-run-*`.
 
 ### LSF jobs (DTU HPC)
 
-```bash
-mkdir -p logs
-bsub < jobs/preprocess.sh                     # all femurs; FEMURS="001" for a subset, HM_ARGS="--offset 1024" if needed
-bash jobs/submit_all.sh                       # 4 training jobs + dependent test jobs + baseline
-```
-
-Single jobs are submitted like this:
+DTU HPC does not pass environment variables from `bsub` on to the job. Settings are therefore given to `jobs/submit.sh`, which writes them into the job before submitting it. They take precedence over `local.sh`.
 
 ```bash
-MODEL=ESRGAN DATA=real bsub -J train_esrgan_real < jobs/train.sh
+bash jobs/submit.sh jobs/preprocess.sh HM_ARGS="--offset 1024"            # all femurs
+bash jobs/submit.sh jobs/preprocess.sh FEMURS="001" HM_ARGS="--offset 1024"
+bash jobs/submit_all.sh                     # 4 training jobs + dependent test jobs + baseline
 ```
 
-If a training job hits the 24 h wall time, resubmit it; it resumes from the last checkpoint. The queue (`gpua100`), memory and wall time are set in the `#BSUB` headers. Check queues with `bstat`/`bqueues`.
+`HM_ARGS="--offset 1024"` is needed when the clinical CT is in HU (negative values). Settings that are the same for every job, such as `HM_ARGS`, can also go in `local.sh`.
+
+Single jobs are submitted like this; anything after `--` is passed on to `bsub`:
+
+```bash
+bash jobs/submit.sh jobs/train.sh MODEL=ESRGAN DATA=real TRAIN_ARGS="--train_femurs 001 --name esrgan_real_f001" -- -J esrgan_real_f001
+bash jobs/submit.sh jobs/test.sh RUN=runs/esrgan_real -- -J test_esrgan_real
+```
+
+Each job prints the settings it received at the top of its log (`logs/<job>_<jobid>.out`). If a training job hits the 24 h wall time, resubmit it with the same command; it resumes from the last checkpoint. The queue (`gpua100`), memory and wall time are set in the `#BSUB` headers. Check jobs with `bjobs` and queues with `bstat`/`bqueues`.
 
 ## Project page
 
