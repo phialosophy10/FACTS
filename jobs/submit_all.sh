@@ -1,10 +1,11 @@
 #!/bin/bash
 # Submit the full benchmark: 4 trainings (SRGAN/ESRGAN x real/synth), the matching
 # test jobs (each tested on both real and synthetic input) and the baseline.
-# Run from the repository root:   DATA_ROOT=/path/to/FACTS bash jobs/submit_all.sh
+# Run from the repository root:   bash jobs/submit_all.sh   (DATA_ROOT from local.sh)
 # Set PREPROCESS=1 to also run the preprocessing first.
 set -e
-: "${DATA_ROOT:?Set DATA_ROOT to the dataset root directory}"
+if [ -z "$DATA_ROOT" ] && [ -f local.sh ]; then source local.sh; fi
+: "${DATA_ROOT:?Set DATA_ROOT in local.sh (see local.sh.example)}"
 mkdir -p logs
 export DATA_ROOT
 

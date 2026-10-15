@@ -19,6 +19,15 @@ fi
 PY_MODULE=${PY_MODULE:-python3/3.12.11}
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Project-specific settings (e.g. DATA_ROOT) from local.sh, which is not tracked by git
+# (copy local.sh.example to local.sh). A DATA_ROOT given on the command line takes precedence.
+if [ -f "$REPO_DIR/local.sh" ]; then
+    _DATA_ROOT_GIVEN="$DATA_ROOT"
+    source "$REPO_DIR/local.sh"
+    if [ -n "$_DATA_ROOT_GIVEN" ]; then export DATA_ROOT="$_DATA_ROOT_GIVEN"; fi
+    unset _DATA_ROOT_GIVEN
+fi
+
 if ! module load "$PY_MODULE" 2>/dev/null; then
     echo "Could not load module '$PY_MODULE'. Available Python modules:"
     module avail python3 2>&1 | grep -o 'python3/[0-9.]*' | sort -uV
@@ -40,3 +49,4 @@ else
 fi
 
 python -c "import torch; print(f'torch {torch.__version__} | CUDA available: {torch.cuda.is_available()}')"
+echo "DATA_ROOT=${DATA_ROOT:-<not set: create local.sh, see local.sh.example>}"

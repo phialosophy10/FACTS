@@ -1,0 +1,9 @@
+# Personal, project-specific settings. Copy this file to local.sh and edit it:
+#     cp local.sh.example local.sh && nano local.sh
+# local.sh is loaded by init.sh (and so by every job script) and is not tracked by git.
+
+# Folder that contains f_001/, f_002/, ...
+export DATA_ROOT=/path/to/FACTS_data
+
+# Optional: Weights & Biases user/team to log to
+# export WANDB_ENTITY=your_wandb_name

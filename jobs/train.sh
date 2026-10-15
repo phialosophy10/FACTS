@@ -1,6 +1,7 @@
 #!/bin/bash
 # Train one model. Submit from the repository root, e.g.
-#   DATA_ROOT=/path/to/FACTS MODEL=ESRGAN DATA=real bsub -J esrgan_real < jobs/train.sh
+#   MODEL=ESRGAN DATA=real bsub -J esrgan_real < jobs/train.sh
+# DATA_ROOT is read from local.sh (or give it on the command line: DATA_ROOT=... bsub < ...)
 # Training resumes from the last checkpoint, so the job can simply be resubmitted
 # if it hits the wall-time limit. Extra train.py arguments can be passed in TRAIN_ARGS.
 #BSUB -J facts_train
@@ -14,8 +15,8 @@
 #BSUB -e logs/train_%J.err
 
 set -e
-: "${DATA_ROOT:?Set DATA_ROOT}" "${MODEL:?Set MODEL (SRGAN/ESRGAN)}" "${DATA:?Set DATA (real/synth)}"
 source init.sh
+: "${DATA_ROOT:?Set DATA_ROOT in local.sh (see local.sh.example)}" "${MODEL:?Set MODEL (SRGAN/ESRGAN)}" "${DATA:?Set DATA (real/synth)}"
 nvidia-smi
 
 # Weights & Biases logging is on by default (WANDB=0 to disable); run `wandb login` once first

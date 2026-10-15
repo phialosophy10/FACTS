@@ -1,6 +1,7 @@
 #!/bin/bash
 # Test a trained model on real and synthetic input (cross-testing). Submit e.g.
-#   DATA_ROOT=/path/to/FACTS RUN=runs/esrgan_real bsub -J test_esrgan_real < jobs/test.sh
+#   RUN=runs/esrgan_real bsub -J test_esrgan_real < jobs/test.sh
+# DATA_ROOT is read from local.sh (or give it on the command line: DATA_ROOT=... bsub < ...)
 # With RUN=baseline the inputs themselves are evaluated (LR reference).
 #BSUB -J facts_test
 #BSUB -q gpua100
@@ -13,8 +14,8 @@
 #BSUB -e logs/test_%J.err
 
 set -e
-: "${DATA_ROOT:?Set DATA_ROOT}" "${RUN:?Set RUN (run directory or 'baseline')}"
 source init.sh
+: "${DATA_ROOT:?Set DATA_ROOT in local.sh (see local.sh.example)}" "${RUN:?Set RUN (run directory or 'baseline')}"
 
 # Weights & Biases logging is on by default (WANDB=0 to disable)
 WANDB_FLAG=""

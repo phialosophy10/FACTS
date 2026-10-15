@@ -1,7 +1,8 @@
 #!/bin/bash
 # Histogram matching + synthetic LR for all femurs (CPU job).
-# Submit from the repository root:   DATA_ROOT=/path/to/FACTS bsub < jobs/preprocess.sh
-# Only some femurs:    DATA_ROOT=... FEMURS="001 002" bsub < jobs/preprocess.sh
+# Submit from the repository root:   bsub < jobs/preprocess.sh
+# Only some femurs:    FEMURS="001 002" bsub < jobs/preprocess.sh
+# DATA_ROOT is read from local.sh (or give it on the command line: DATA_ROOT=... bsub < ...)
 # Extra arguments for histogram_match.py (e.g. --offset 1024) in HM_ARGS
 #BSUB -J facts_preproc
 #BSUB -q hpc
@@ -13,8 +14,8 @@
 #BSUB -e logs/preproc_%J.err
 
 set -e
-: "${DATA_ROOT:?Set DATA_ROOT to the dataset root directory}"
 source init.sh
+: "${DATA_ROOT:?Set DATA_ROOT in local.sh (see local.sh.example)}"
 
 FEMUR_ARGS=""
 if [ -n "$FEMURS" ]; then FEMUR_ARGS="--femurs $FEMURS"; fi

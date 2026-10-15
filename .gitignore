@@ -10,3 +10,6 @@ logs/
 *.pt
 docs/_site/
 docs/.jekyll-cache/
+
+# personal settings (DATA_ROOT etc.)
+local.sh

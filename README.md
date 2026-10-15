@@ -43,8 +43,11 @@ created here:
 
 ```bash
 git clone https://github.com/phialosophy10/FACTS.git && cd FACTS
+cp local.sh.example local.sh && nano local.sh   # set DATA_ROOT (path to the folder with f_001/, f_002/, ...)
 source init.sh            # first call creates the venv, later calls only activate it
 ```
+
+`local.sh` holds your personal settings for this project (`DATA_ROOT`, optionally `WANDB_ENTITY`). It is loaded by `init.sh`, so also by every job script, and it is not tracked by git. A `DATA_ROOT=...` given on the command line takes precedence over it.
 
 `init.sh` loads a Python module, creates a venv in `~/venvs/facts`, installs PyTorch (CUDA wheel) and `requirements.txt`, and downloads the LPIPS weights. You can override the defaults:
 
@@ -59,7 +62,7 @@ PY_MODULE=python3/3.12.4 TORCH_CUDA=cu126 VENV_DIR=/work3/$USER/venvs/facts sour
 
 ## Running
 
-Run all steps from the repository root.
+Run all steps from the repository root, after `source init.sh` (which sets `$DATA_ROOT` from `local.sh`).
 
 **1. Preprocessing** (CPU):
 
@@ -130,14 +133,14 @@ The key is saved in `~/.netrc`, which the compute nodes can read too.
 
 ```bash
 mkdir -p logs
-DATA_ROOT=/path/to/FACTS bsub < jobs/preprocess.sh
-DATA_ROOT=/path/to/FACTS bash jobs/submit_all.sh       # 4 training jobs + dependent test jobs + baseline
+bsub < jobs/preprocess.sh                     # all femurs; FEMURS="001" for a subset, HM_ARGS="--offset 1024" if needed
+bash jobs/submit_all.sh                       # 4 training jobs + dependent test jobs + baseline
 ```
 
 Single jobs are submitted like this:
 
 ```bash
-DATA_ROOT=... MODEL=ESRGAN DATA=real bsub -J train_esrgan_real < jobs/train.sh
+MODEL=ESRGAN DATA=real bsub -J train_esrgan_real < jobs/train.sh
 ```
 
 If a training job hits the 24 h wall time, resubmit it; it resumes from the last checkpoint. The queue (`gpua100`), memory and wall time are set in the `#BSUB` headers. Check queues with `bstat`/`bqueues`.
