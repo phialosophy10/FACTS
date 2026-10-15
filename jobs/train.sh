@@ -16,6 +16,7 @@
 
 set -e
 source init.sh
+echo "Settings: DATA_ROOT=$DATA_ROOT | MODEL=$MODEL | DATA=$DATA | TRAIN_ARGS=${TRAIN_ARGS:-<none>} | WANDB=${WANDB:-1}"
 : "${DATA_ROOT:?Set DATA_ROOT in local.sh (see local.sh.example)}" "${MODEL:?Set MODEL (SRGAN/ESRGAN)}" "${DATA:?Set DATA (real/synth)}"
 nvidia-smi
 

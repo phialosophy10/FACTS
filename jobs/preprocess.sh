@@ -15,6 +15,7 @@
 
 set -e
 source init.sh
+echo "Settings: DATA_ROOT=$DATA_ROOT | FEMURS=${FEMURS:-<all>} | HM_ARGS=${HM_ARGS:-<none>}"
 : "${DATA_ROOT:?Set DATA_ROOT in local.sh (see local.sh.example)}"
 
 FEMUR_ARGS=""

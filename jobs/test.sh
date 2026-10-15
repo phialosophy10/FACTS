@@ -15,6 +15,7 @@
 
 set -e
 source init.sh
+echo "Settings: DATA_ROOT=$DATA_ROOT | RUN=$RUN | TEST_ARGS=${TEST_ARGS:-<none>} | WANDB=${WANDB:-1}"
 : "${DATA_ROOT:?Set DATA_ROOT in local.sh (see local.sh.example)}" "${RUN:?Set RUN (run directory or 'baseline')}"
 
 # Weights & Biases logging is on by default (WANDB=0 to disable)
