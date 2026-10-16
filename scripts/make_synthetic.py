@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from facts import config, io  # noqa: E402
+from facts import config, io, qa  # noqa: E402
 from facts.synthetic import degrade_slice  # noqa: E402
 
 
@@ -30,6 +30,9 @@ def parse_args():
     p.add_argument("--axis", type=int, default=config.SLICE_AXIS, help="Slicing axis for the 2D degradation")
     p.add_argument("--workers", type=int, default=4, help="Number of threads")
     p.add_argument("--overwrite", action="store_true")
+    p.add_argument("--qa_dir", default="results/preprocessing", help="Where histogram_match.py saved the mapping")
+    p.add_argument("--no_snapshots", action="store_true",
+                   help="Do not write snapshot figures to <qa_dir>/snapshots (see scripts/inspect_preprocessing.py)")
     return p.parse_args()
 
 
@@ -56,6 +59,10 @@ def main():
                 io.set_slice(out, i, im, args.axis)
         io.save_volume(out_path, out)
         print(f"{name}: saved {out_path}")
+        if not args.no_snapshots:
+            snap_dir = os.path.join(args.qa_dir, "snapshots")
+            qa.inspect_femur(args.root, femur, snap_dir, args.qa_dir, axis=args.axis)
+            print(f"{name}: snapshots in {snap_dir}")
 
 
 if __name__ == "__main__":

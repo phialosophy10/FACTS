@@ -18,7 +18,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from facts import config, io  # noqa: E402
+from facts import config, io, qa  # noqa: E402
 from facts.histmatch import apply_lut, compute_matching  # noqa: E402
 
 
@@ -35,6 +35,8 @@ def parse_args():
     p.add_argument("--qa_dir", default="results/preprocessing",
                    help="Where to save histograms and mapping for quality assurance")
     p.add_argument("--overwrite", action="store_true")
+    p.add_argument("--no_snapshots", action="store_true",
+                   help="Do not write snapshot figures to <qa_dir>/snapshots (see scripts/inspect_preprocessing.py)")
     return p.parse_args()
 
 
@@ -91,6 +93,10 @@ def main():
         with open(os.path.join(args.qa_dir, f"{name}_histmatch.json"), "w") as f:
             json.dump({"femur": name, "hr_range": stats["src_range"], "lr_range": stats["ref_range"],
                        "offset": args.offset, "dtype": args.dtype, "zero_outside": args.zero_outside}, f, indent=2)
+        if not args.no_snapshots:
+            snap_dir = os.path.join(args.qa_dir, "snapshots")
+            qa.inspect_femur(args.root, femur, snap_dir, args.qa_dir)
+            print(f"{name}: snapshots in {snap_dir}")
         print(f"{name}: done")
 
 
