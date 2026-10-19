@@ -22,8 +22,9 @@ echo "Settings: DATA_ROOT=$DATA_ROOT | FEMURS=${FEMURS:-<all>} | HM_ARGS=${HM_AR
 FEMUR_ARGS=""
 if [ -n "$FEMURS" ]; then FEMUR_ARGS="--femurs $FEMURS"; fi
 # OVERWRITE=1 recomputes existing HR_hm/SY_hm files
-if [ "${OVERWRITE:-0}" = "1" ]; then FEMUR_ARGS="$FEMUR_ARGS --overwrite"; fi
+OVERWRITE_ARG=""
+if [ "${OVERWRITE:-0}" = "1" ]; then OVERWRITE_ARG="--overwrite"; fi
 
-python scripts/histogram_match.py --root "$DATA_ROOT" $FEMUR_ARGS $HM_ARGS
-python scripts/make_synthetic.py --root "$DATA_ROOT" $FEMUR_ARGS --workers 8
+python scripts/histogram_match.py --root "$DATA_ROOT" $FEMUR_ARGS $OVERWRITE_ARG $HM_ARGS
+python scripts/make_synthetic.py --root "$DATA_ROOT" $FEMUR_ARGS $OVERWRITE_ARG --workers 8
 python scripts/check_data.py --root "$DATA_ROOT" $FEMUR_ARGS
