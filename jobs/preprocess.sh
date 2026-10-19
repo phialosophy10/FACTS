@@ -2,7 +2,8 @@
 # Histogram matching + synthetic LR for all femurs (CPU job).
 # Submit from the repository root:   bash jobs/submit.sh jobs/preprocess.sh
 # Only some femurs:    bash jobs/submit.sh jobs/preprocess.sh FEMURS="001 002"
-# Extra arguments for histogram_match.py (e.g. --offset 1024) in HM_ARGS.
+# Extra arguments for histogram_match.py (e.g. --method linear --offset 2048) in HM_ARGS.
+# OVERWRITE=1 recomputes femurs that were already processed.
 # DATA_ROOT (and defaults for FEMURS/HM_ARGS) are read from local.sh.
 #BSUB -J facts_preproc
 #BSUB -q hpc
@@ -15,11 +16,13 @@
 
 set -e
 source init.sh
-echo "Settings: DATA_ROOT=$DATA_ROOT | FEMURS=${FEMURS:-<all>} | HM_ARGS=${HM_ARGS:-<none>}"
+echo "Settings: DATA_ROOT=$DATA_ROOT | FEMURS=${FEMURS:-<all>} | HM_ARGS=${HM_ARGS:-<none>} | OVERWRITE=${OVERWRITE:-0}"
 : "${DATA_ROOT:?Set DATA_ROOT in local.sh (see local.sh.example)}"
 
 FEMUR_ARGS=""
 if [ -n "$FEMURS" ]; then FEMUR_ARGS="--femurs $FEMURS"; fi
+# OVERWRITE=1 recomputes existing HR_hm/SY_hm files
+if [ "${OVERWRITE:-0}" = "1" ]; then FEMUR_ARGS="$FEMUR_ARGS --overwrite"; fi
 
 python scripts/histogram_match.py --root "$DATA_ROOT" $FEMUR_ARGS $HM_ARGS
 python scripts/make_synthetic.py --root "$DATA_ROOT" $FEMUR_ARGS --workers 8
