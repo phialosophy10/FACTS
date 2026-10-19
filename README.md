@@ -11,7 +11,8 @@ FACTS is a benchmark for real-world 3D super-resolution. It contains 13 human pr
 facts/                    library code
   config.py               femur IDs, train/test split, voxel size, synthetic parameters
   io.py                   paths and (memory-mapped) TIFF I/O
-  histmatch.py            masked histogram matching
+  histmatch.py            masked histogram matching and linear calibration
+  qa.py                   preprocessing snapshot figures
   synthetic.py            Gaussian blur + 4x down/up-sampling
   data.py                 patch sampling inside the bone mask, intensity normalisation
   models.py               SRGAN / ESRGAN generators and discriminator (2D)
@@ -19,6 +20,9 @@ facts/                    library code
 scripts/
   histogram_match.py      HR -> LR intensity scale     => f_NNN/HR/f_NNN_hm.tif
   make_synthetic.py       synthetic LR from HR_hm      => f_NNN/SY/f_NNN_hm.tif
+  check_data.py           shapes, dtypes and intensity statistics per femur
+  plot_histograms.py      intensity histograms of all volumes
+  inspect_preprocessing.py  snapshot figures of the preprocessing
   make_results.py         metrics + figures -> project page (docs/)
 train.py                  training (L1 + adversarial loss)
 test.py                   inference + evaluation (incl. cross-testing and baseline)
@@ -67,11 +71,18 @@ Run all steps from the repository root, after `source init.sh` (which sets `$DAT
 **1. Preprocessing** (CPU):
 
 ```bash
-python scripts/histogram_match.py --root $DATA_ROOT     # HR -> f_NNN_hm.tif
-python scripts/make_synthetic.py  --root $DATA_ROOT     # SY/f_NNN_hm.tif
+python scripts/plot_histograms.py --root $DATA_ROOT                               # look at all volumes first
+python scripts/histogram_match.py --root $DATA_ROOT --method linear --offset 2048  # HR -> HR/f_NNN_hm.tif
+python scripts/make_synthetic.py  --root $DATA_ROOT                               # SY/f_NNN_hm.tif
 ```
 
-The histogram of the micro-CT inside the mask is matched to that of the clinical CT inside the same mask. The mapping is then applied to the whole micro-CT volume. If the clinical CT intensities are in HU (negative values), uint16 cannot hold them: the script stops and suggests `--offset 1024` (or use `--dtype float32`). Histograms and the mapping are saved to `results/preprocessing/`.
+`histogram_match.py` brings the micro-CT to the intensity scale of the clinical CT, in one of two ways (`--method`):
+* **`histogram`** (default): matches the micro-CT histogram inside the mask to the clinical-CT histogram. The micro-CT has sharp, separated peaks (marrow/air and bone) while the clinical CT is blurred, so this mapping is strongly non-linear: it stretches some intensity ranges, together with their noise, and compresses others.
+* **`linear`**: `HR_hm = a · HR + b`. The values of `a` and `b` are fitted so that `a · blur(HR) + b` matches the clinical CT inside the mask (least squares on random blocks; the blur width is chosen by the best R²). It keeps the micro-CT's contrast and noise proportions. Because thin trabeculae are blurred in the clinical CT, HR_hm bone values end up higher than the clinical CT's, which is physically expected. The fit (`a`, `b`, blur width, R² for each width) is printed and saved in `HR/f_NNN_hm.json`.
+
+If the clinical CT is in HU (negative values), uint16 cannot hold it, so add an `--offset` and use **the same offset for all femurs**. With `--method linear`, micro-CT noise in air/marrow maps below −1024 HU. The script reports how much of the mask is clipped and suggests a larger offset if needed (or use `--dtype float32`).
+
+Both preprocessing scripts write snapshot figures to `results/preprocessing/snapshots/`. To produce them for already processed femurs, run `scripts/inspect_preprocessing.py`. The figures show one slice at every stage, the intensity mapping and its gain, a registration overlay and intensity profiles. `plot_histograms.py` writes histograms of all volumes and a CSV of statistics to `results/histograms/` (`--mods LR HR HR_hm SY_hm`, `--whole`, `--log`).
 
 **2. Training** (4 runs: {SRGAN, ESRGAN} × {real, synth}):
 

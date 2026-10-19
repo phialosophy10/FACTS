@@ -61,3 +61,58 @@ def compute_matching(src, ref, mask, n_bins=N_BINS):
 def apply_lut(im, lut):
     x, y = lut
     return np.interp(im.astype(np.float64), x, y)
+
+
+# ------------------------------------------------------------------ linear calibration ---
+def _block_starts(mask, block, margin, n_blocks, rng, step=8):
+    """Random block corners whose central voxel is inside the mask (searched on a coarse grid)."""
+    coarse = np.asarray(mask[::step, ::step, ::step]) > 0
+    cand = np.argwhere(coarse) * step
+    lo = margin
+    hi = np.array(mask.shape) - block - margin
+    if len(cand) == 0 or np.any(hi < lo):
+        raise ValueError("Empty mask or volume too small for the requested block size")
+    cand = np.unique(np.clip(cand - block // 2, lo, hi), axis=0)
+    return cand[rng.choice(len(cand), size=min(n_blocks, len(cand)), replace=False)]
+
+
+def fit_linear(src, ref, mask, sigmas=(0, 1, 2, 3, 4, 6, 8, 12), n_blocks=12, block=96, seed=0):
+    """Fit ref ~ a * G_sigma(src) + b inside the mask (least squares).
+
+    The clinical CT (ref) is a blurred version of the micro-CT (src) on (roughly) a linear
+    intensity scale, so the micro-CT is first blurred with a Gaussian of width sigma
+    (voxels; the best sigma is chosen by R^2) before fitting. The fit is done on random
+    blocks inside the mask, so the whole volume never has to be blurred.
+
+    Returns a, b, best sigma and a list of (sigma, a, b, r2) for all sigmas tried.
+    """
+    from scipy.ndimage import gaussian_filter
+
+    rng = np.random.default_rng(seed)
+    # Keep only blur widths whose margin fits in the volume, and shrink blocks for small volumes
+    sigmas = [s for s in sigmas if 2 * int(np.ceil(3 * s)) + 16 <= min(mask.shape)] or [0]
+    margin = int(np.ceil(3 * max(sigmas)))
+    block = min(block, min(mask.shape) - 2 * margin)
+    starts = _block_starts(mask, block, margin, n_blocks, rng)
+    blocks = []
+    for z, y, x in starts:
+        sl = tuple(slice(s - margin, s + block + margin) for s in (z, y, x))
+        inner = tuple(slice(margin, margin + block) for _ in range(3))
+        blocks.append((np.asarray(src[sl], dtype=np.float32), np.asarray(ref[sl], dtype=np.float32)[inner],
+                       np.asarray(mask[sl])[inner] > 0, inner))
+
+    results = []
+    for sigma in sigmas:
+        xs, ys = [], []
+        for s_blk, r_blk, m_blk, inner in blocks:
+            g = gaussian_filter(s_blk, sigma) if sigma > 0 else s_blk
+            xs.append(g[inner][m_blk])
+            ys.append(r_blk[m_blk])
+        x, y = np.concatenate(xs).astype(np.float64), np.concatenate(ys).astype(np.float64)
+        a, b = np.polyfit(x, y, 1)
+        r2 = 1 - np.var(y - (a * x + b)) / np.var(y)
+        results.append((float(sigma), float(a), float(b), float(r2)))
+    best = max(results, key=lambda r: r[3])
+    if best[1] <= 0:
+        raise ValueError(f"Linear fit gave a non-positive slope (a = {best[1]:.3g}); check registration/masks")
+    return best[1], best[2], best[0], results

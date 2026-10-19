@@ -131,8 +131,13 @@ def mapping_figure(path, lut_x, lut_y, offset, hr_hist=None, hr_edges=None, afte
     axes[1].set_title("Mapping: original micro-CT value -> HR_hm value (incl. offset)", fontsize=9)
     gx, gain = mapping_gain(lut_x, lut_y)
     axes[2].semilogy(gx, np.maximum(gain, 1e-2), color=C_HR, lw=1.5)
+    if np.ptp(gain) < 0.01 * abs(gain.mean()):  # linear mapping: constant gain
+        axes[2].set_ylim(gain.mean() / 3, gain.mean() * 3)
+        axes[2].set_title(f"Gain of the mapping: constant ({gain.mean():.3g}), linear mapping", fontsize=9)
     axes[2].set_ylabel("gain\n(log scale)")
-    axes[2].set_title("Gain of the mapping: noise in an intensity range is multiplied by this factor", fontsize=9)
+    if not axes[2].get_title():
+        axes[2].set_title("Gain of the mapping: how much each intensity range (and its noise) is stretched",
+                          fontsize=9)
     for ax in axes[:3]:
         ax.set_xlabel("original micro-CT intensity")
     if after is not None:
@@ -215,14 +220,21 @@ def inspect_femur(root, femur, out_dir, qa_dir="results/preprocessing", idx=None
 
     npz = os.path.join(qa_dir, f"{name}_histmatch.npz")
     lut = np.load(npz) if os.path.exists(npz) else None
-    hm_float = apply_lut(hr, (lut["lut_x"], lut["lut_y"])).astype(np.float32) + offset if lut is not None else None
+    hm_float = None
+    if lut is not None and "lin_a" in lut:
+        hm_float = (float(lut["lin_a"]) * hr + float(lut["lin_b"]) + offset).astype(np.float32)
+    elif lut is not None:
+        hm_float = apply_lut(hr, (lut["lut_x"], lut["lut_y"])).astype(np.float32) + offset
 
     # Window used for training: percentiles 0.5/99.5 of the (offset) clinical CT inside the mask
     lr_vol = io.open_volume(io.get_path(root, femur, "LR"))
     sub_m = np.asarray(mask_vol[::4, ::4, ::4]) > 0
     train_win = tuple(float(v) for v in np.percentile(np.asarray(lr_vol[::4, ::4, ::4])[sub_m] + offset, (0.5, 99.5)))
 
-    summary = {"femur": name, "slice": idx, "axis": axis, "offset": offset, "training_window": train_win}
+    summary = {"femur": name, "slice": idx, "axis": axis, "offset": offset, "training_window": train_win,
+               "method": str(lut["method"]) if lut is not None and "method" in lut else "histogram"}
+    if lut is not None and "lin_a" in lut:
+        summary["linear"] = f"HR_hm = {float(lut['lin_a']):.4g} * HR + {float(lut['lin_b']):.4g}"
     for label, im in [("LR+offset", lr), ("HR", hr), ("HR_hm", hm), ("HR_hm_float", hm_float), ("SY_hm", sy)]:
         if im is not None:
             summary[label] = {k: float(v) for k, v in
@@ -254,7 +266,7 @@ def inspect_femur(root, femur, out_dir, qa_dir="results/preprocessing", idx=None
     if hm is not None:
         panels.append((f"HR_hm file ({summary.get('HR_hm_dtype')})", hm, True))
     if hm is not None and hm_float is not None:
-        panels.append(("|file - recomputed|\n(should be <= 0.5)", np.abs(hm - hm_float), (0.0, 2.0)))
+        panels.append(("|file - recomputed|\n(<= 0.5 unless clipped)", np.abs(hm - hm_float), (0.0, 2.0)))
     if sy is not None:
         panels.append(("Synthetic (SY_hm)", sy, True))
     stages_figure(os.path.join(out_dir, f"{tag}_stages.png"), panels, mask, zoom, train_win, title)
