@@ -17,6 +17,8 @@ facts/                    library code
   data.py                 patch sampling inside the bone mask, intensity normalisation
   models.py               SRGAN / ESRGAN generators and discriminator (2D)
   metrics.py              PSNR, SSIM, LPIPS, BV/TV, Tb.Th
+  inference.py            loading trained generators, tiled (batched) inference
+  uncertainty.py          noise levels, blended noisy inputs, sparsification/AUSE
 scripts/
   histogram_match.py      HR -> LR intensity scale     => f_NNN/HR/f_NNN_hm.tif
   make_synthetic.py       synthetic LR from HR_hm      => f_NNN/SY/f_NNN_hm.tif
@@ -26,6 +28,7 @@ scripts/
   make_results.py         metrics + figures -> project page (docs/)
 train.py                  training (L1 + adversarial loss)
 test.py                   inference + evaluation (incl. cross-testing and baseline)
+uncertainty.py            input-noise uncertainty along a synthetic -> real input blend
 jobs/                     LSF job scripts for DTU HPC
 docs/                     GitHub Pages project page (Jekyll)
 init.sh                   creates/activates the Python environment on DTU HPC
@@ -109,7 +112,24 @@ python test.py --root $DATA_ROOT --baseline --input real          # LR baseline 
 
 Metrics are computed inside the mask on every 10th slice (`--eval_stride`): PSNR, SSIM, LPIPS, BV/TV and Tb.Th (2D local thickness).
 
-**4. Project page:**
+**4. Uncertainty along synthetic → real input (optional):**
+
+```bash
+python uncertainty.py --root $DATA_ROOT                  # or: bash jobs/submit.sh jobs/uncertainty.sh
+```
+
+The input is blended as `x_α = (1 − α) · synthetic + α · real`, for α = 0, 0.1, …, 1. Each trained model super-resolves N = 10 noisy versions of every blend, on every 50th slice of the test femurs (`--n_samples`, `--slice_stride`). Noise is added in two parts:
+* **Equalisation:** one fixed draw per α tops the blend's noise level up to that of the real CT. Every α then has the same total noise, so only the structure of the input changes. With `--noise fixed` this step is skipped.
+* **Perturbation:** a fresh draw for each repetition, with the same strength for every α (`--perturb_scale` × the real CT's noise std, estimated from the data).
+
+The uncertainty is the per-voxel standard deviation of the N outputs, and the error is the difference between their mean and the micro-CT. `results/uncertainty/` contains:
+* `uncertainty.csv`: mean uncertainty and error per run, femur and α, the Spearman correlation between uncertainty and error, and AUSE (area between the sparsification curve and the oracle; lower means the uncertainty ranks errors better);
+* `uncertainty_vs_alpha.png`;
+* `examples_<run>.png`: input, SR, micro-CT, uncertainty and error maps at α = 0, 0.5 and 1.
+
+The noise is white Gaussian, which is a simplification: real CT noise is spatially correlated.
+
+**5. Project page:**
 
 ```bash
 python scripts/make_results.py     # -> docs/_data/results.json, docs/assets/img/...

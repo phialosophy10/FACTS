@@ -26,7 +26,7 @@ import torch
 from facts import config, io
 from facts.data import FemurVolume, Normalizer
 from facts.metrics import LPIPSMetric, bone_metrics, psnr_masked, ssim_masked
-from facts.models import build_generator
+from facts.inference import load_generator, sr_slice
 from facts.tracking import add_wandb_args, example_image, init_wandb
 
 
@@ -49,24 +49,6 @@ def parse_args():
     return p.parse_args()
 
 
-@torch.inference_mode()
-def sr_slice(G, im, device, tile=512, overlap=64):
-    """Super-resolve a normalised 2D image with overlapping tiles."""
-    H, W = im.shape
-    out = np.zeros((H, W), np.float32)
-    step = tile - 2 * overlap
-    x = torch.from_numpy(np.ascontiguousarray(im, dtype=np.float32))[None, None].to(device)
-    for y0 in range(0, H, step):
-        for x0 in range(0, W, step):
-            ya, xa = max(y0 - overlap, 0), max(x0 - overlap, 0)
-            yb, xb = min(y0 + step + overlap, H), min(x0 + step + overlap, W)
-            with torch.autocast(device.type, enabled=device.type == "cuda"):
-                pred = G(x[..., ya:yb, xa:xb]).float()[0, 0].cpu().numpy()
-            yc, xc = min(y0 + step, H), min(x0 + step, W)
-            out[y0:yc, x0:xc] = pred[y0 - ya:yc - ya, x0 - xa:xc - xa]
-    return out
-
-
 def main():
     args = parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -76,11 +58,8 @@ def main():
         meta = {"model": "Input", "train_data": "-"}
         out_dir = args.out or os.path.join("results", "baseline", f"test_{args.input}")
     else:
-        meta = torch.load(os.path.join(args.run, args.weights), map_location=device, weights_only=False)
-        G = build_generator(meta["model"], meta["n_blocks"]).to(device).eval()
-        G.load_state_dict(meta.pop("G"))
+        G, norm, meta = load_generator(args.run, device, args.weights)
         axis = meta["axis"]
-        norm = Normalizer(**meta["normalizer"])
         out_dir = args.out or os.path.join(args.run, f"test_{args.input}")
     os.makedirs(out_dir, exist_ok=True)
     lpips_fn = None if args.no_lpips else LPIPSMetric(device)
