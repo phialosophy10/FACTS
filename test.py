@@ -27,7 +27,7 @@ from facts import config, io
 from facts.data import FemurVolume, Normalizer
 from facts.metrics import LPIPSMetric, bone_metrics, psnr_masked, ssim_masked
 from facts.models import build_generator
-from facts.tracking import add_wandb_args, init_wandb
+from facts.tracking import add_wandb_args, example_image, init_wandb
 
 
 def parse_args():
@@ -152,10 +152,9 @@ def main():
         np.savez_compressed(os.path.join(out_dir, f"{f.name}_example.npz"), hr=ev["hr"][k], sr=ev["sr"][k],
                             lr=lr_ex, mask=ev["mask"][k], slice=z)
         if wandb_run:
-            ys, xs = np.nonzero(ev["mask"][k])
-            crop = (slice(ys.min(), ys.max() + 1), slice(xs.min(), xs.max() + 1))
-            strip = np.concatenate([lr_ex[crop], ev["sr"][k][crop], ev["hr"][k][crop]], axis=1)
-            wandb.log({f"examples/{f.name}": wandb.Image(strip, caption=f"{f.name}, slice {z}: input | SR | micro-CT"),
+            img = example_image(lr_ex, ev["sr"][k], ev["hr"][k], ev["mask"][k],
+                                f"{f.name}, slice {z}: input | SR | micro-CT")
+            wandb.log({f"examples/{f.name}": img,
                        **{f"{f.name}/{m}": v for m, v in res.items() if isinstance(v, float)}})
 
         if sr is not None:

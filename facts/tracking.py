@@ -38,3 +38,19 @@ def init_wandb(args, out_dir, name, config, job_type, group=None):
                      resume="allow", config=config, job_type=job_type, group=group,
                      tags=args.wandb_tags, dir=out_dir)
     return run
+
+
+def example_image(lr, sr, hr, mask, caption=""):
+    """wandb.Image of input | SR | micro-CT side by side (cropped to the mask), from images in [0, 1].
+
+    The images are converted to 8-bit here: recent wandb versions do not rescale float images,
+    so values in [0, 1] would otherwise all show up as black.
+    """
+    import numpy as np
+    import wandb
+
+    ys, xs = np.nonzero(mask)
+    crop = (slice(ys.min(), ys.max() + 1), slice(xs.min(), xs.max() + 1))
+    gap = np.ones((ys.max() - ys.min() + 1, 4), dtype=np.float32)  # white separator
+    strip = np.concatenate([lr[crop], gap, sr[crop], gap, hr[crop]], axis=1)
+    return wandb.Image((np.clip(strip, 0, 1) * 255).round().astype(np.uint8), caption=caption)
