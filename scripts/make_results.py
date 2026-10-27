@@ -143,8 +143,8 @@ def histmatch_figures(pre_dir, out_dir):
         axes[0].set_title("Before: micro-CT intensities", fontsize=10)
         axes[1].plot(centres(c_ref), smooth(d["ref_hist"]), color=COLORS["LR"], lw=2, label="Clinical CT")
         axes[1].plot(centres(c_ref), smooth(d["hm_hist"]), color=COLORS["HR_hm"], lw=2, ls="--",
-                     label="Micro-CT (matched)")
-        axes[1].set_title("After: matched to clinical-CT scale", fontsize=10)
+                     label="Micro-CT (calibrated)")
+        axes[1].set_title("After: on the clinical-CT scale", fontsize=10)
         for ax in axes:
             ax.set_xlabel("Intensity")
             ax.set_ylabel("Fraction of voxels in mask")

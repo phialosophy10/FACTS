@@ -2,8 +2,8 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-runs/
-results/
+/runs/
+/results/
 logs/*
 !logs/.gitkeep
 *.tif

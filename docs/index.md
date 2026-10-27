@@ -102,27 +102,33 @@ plt.show()
 
 The code for all steps is in the [GitHub repository](https://github.com/phialosophy10/FACTS).
 
-### Histogram matching
+### Intensity calibration
 
-The clinical CT and the micro-CT have very different intensity scales (see the table above). To let a network learn the mapping from LR to HR, we bring the micro-CT to the scale of the clinical CT. For each femur, we match the histogram of the HR voxels **inside the bone mask** to the histogram of the LR voxels inside the same mask. The resulting monotone intensity mapping is applied to the whole HR volume, which is saved as `HR/f_NNN_hm.tif` (uint16).
+The clinical CT (in Hounsfield units) and the micro-CT have very different intensity scales (see the table above). To let a network learn the mapping from LR to HR, we bring the micro-CT to the scale of the clinical CT with a **linear calibration** per femur:
+
+<p class="callout">HR<sub>cal</sub> = <i>a</i> &middot; HR + <i>b</i></p>
+
+The clinical CT is essentially a blurred version of the same object on a linear intensity scale. So *a* and *b* are fitted by least squares such that *a* &middot; G<sub>&sigma;</sub>(HR) + *b* matches the clinical CT inside the bone mask, where G<sub>&sigma;</sub> is a Gaussian blur. The blur width &sigma; is chosen per femur by the best fit (R<sup>2</sup> = 0.70–0.95; &sigma; = 4 micro-CT voxels for all femurs except one). The calibrated volume is saved as `HR/f_NNN_hm.tif` (uint16, shifted by +2048 so that air fits in the unsigned range).
+
+A linear mapping keeps the contrast and noise proportions of the micro-CT. We first tried histogram matching, which makes the two histograms identical. Because the micro-CT has sharp, separated intensity peaks while the clinical CT is blurred, that mapping is strongly non-linear: it stretched some intensity ranges, and their noise, and compressed others.
 
 {% assign hm = site.data.results.histmatch %}
 {% if hm.size > 0 %}
 <figure>
-  <img class="figure" src="{{ '/assets/img/' | append: hm[0].file | relative_url }}" alt="Histograms before and after histogram matching">
-  <figcaption>Intensity histograms inside the bone mask for {{ hm[0].femur }}. Left: original micro-CT. Right: clinical CT and histogram-matched micro-CT.</figcaption>
+  <img class="figure" src="{{ '/assets/img/' | append: hm[0].file | relative_url }}" alt="Intensity histograms before and after calibration">
+  <figcaption>Intensity histograms inside the bone mask for {{ hm[0].femur }}. Left: original micro-CT. Right: clinical CT and calibrated micro-CT. The histograms do not need to coincide: thin trabeculae are blurred in the clinical CT, so its bone values are lower than in the sharp, calibrated micro-CT.</figcaption>
 </figure>
 {% endif %}
 
 ### Synthetic low-resolution data
 
-To compare with the standard SR setting, we also make a synthetic low-resolution version of the histogram-matched micro-CT. Each 2D slice is
+To compare with the standard SR setting, we also make a synthetic low-resolution version of the calibrated micro-CT. Each 2D slice is
 
 1. blurred with a Gaussian kernel (&sigma; = 1.2),
 2. downsampled by a factor of 4, and
 3. upsampled 4&times; with linear interpolation, back to the original grid.
 
-The result is saved as `SY/f_NNN_hm.tif`. Because the synthetic data is made from the matched HR volume, the real input, the synthetic input and the target all share one intensity scale.
+The result is saved as `SY/f_NNN_hm.tif`. Because the synthetic data is made from the calibrated HR volume, the real input, the synthetic input and the target all share one intensity scale.
 
 ## Benchmark {#benchmark}
 
